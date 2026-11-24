@@ -17,7 +17,7 @@ This build is for Forever only. It does not target retail or other Classic clien
 
 1. Download the latest release zip.
 2. Extract it so the folder sits at `Interface/AddOns/ActionHouse` and `ActionHouse.toc` is directly inside it.
-3. Restart the game (a `/reload` will not discover a new addon).
+3. `/reload` — the client rescans `AddOns` on a UI reload and picks the new folder up. If it is still missing, tick **ActionHouse** in the AddOns list at character select.
 4. Open the auction house, or type `/ahv`.
 
 ## Quick start
@@ -157,6 +157,29 @@ These diagnostics are safe to leave enabled; `:probe` does not make mutating auc
 ## Compatibility
 
 ActionHouse uses the modern `C_AuctionHouse` API and Blizzard's auction house frames. Other auction house addons (Auctionator, TSM, Auctioneer, etc.) may also hook the same APIs. If you see duplicate windows or missing results, try ActionHouse with the other auction house addon disabled. Please report compatibility problems on the CurseForge project page.
+
+## Development
+
+Source of truth: https://github.com/bookenjoyer67/ActionHouse
+
+```bash
+./install.sh              # copy into the Forever client; /reload to pick it up
+./install.sh --link       # symlink instead, for iteration
+lua5.1 tests/run.lua      # unit suite
+lua5.1 tests/smoke_ui.lua # headless UI walkthrough — currently fails at the item-post check (0.5.x post-confirmation flow)
+stylua --check .          # formatting
+selene Util/Money.lua Util/Keys.lua State.lua Demo.lua
+```
+
+`.pkgmeta` lists what is kept out of the release zip; `install.sh` reads that same list so a local install matches a downloaded release.
+
+Releases are cut by pushing a version tag — no local packaging:
+
+```bash
+git tag 0.6.0 && git push origin 0.6.0
+```
+
+`.github/workflows/release.yml` stamps the tag into the TOC, runs the unit suite, packages with BigWigsMods/packager, attaches the zip to a GitHub Release, and uploads it to CurseForge (`CF_API_TOKEN` repository secret).
 
 ## License
 

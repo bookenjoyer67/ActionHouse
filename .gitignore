@@ -1,2 +1,5 @@
+*.bak
+*.tmp
+.DS_Store
 .release/
 .release.sh

@@ -2,6 +2,7 @@
 # Everything not listed here ships inside ActionHouse-<version>.zip.
 ignore:
   - .github
+  - .pkgmeta
   - .gitignore
   - .selene.toml
   - stylua.toml
