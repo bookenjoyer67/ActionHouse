@@ -1590,7 +1590,13 @@ function UI:ClearShiftComparison()
 end
 
 function UI:UpdateShiftComparison()
-    if not self.frame or not self.frame:IsShown() or not self.state or self.state.tab ~= "upgrades" or self.state.demo then
+    if
+        not self.frame
+        or not self.frame:IsShown()
+        or not self.state
+        or self.state.tab ~= "upgrades"
+        or self.state.demo
+    then
         self:ClearShiftComparison()
         return
     end

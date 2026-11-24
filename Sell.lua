@@ -1181,30 +1181,14 @@ function Sell:PostForm(form)
         normalized = normalized or bidChanged or buyoutChanged
         local bidParam = bid > 0 and bid or nil
         local buyoutParam = buyout > 0 and buyout or nil
-        local sent, result = call(
-            "PostItem",
-            form.location,
-            duration.value,
-            quantity.value,
-            bidParam,
-            buyoutParam
-        )
+        local sent, result = call("PostItem", form.location, duration.value, quantity.value, bidParam, buyoutParam)
         if not sent then
             self.lastError = "Post failed: " .. tostring(result)
             self:Notify(self.lastError, true)
             return false
         end
         if result == true then
-            if
-                not cachePendingPost(
-                    false,
-                    form.location,
-                    duration.value,
-                    quantity.value,
-                    bidParam,
-                    buyoutParam
-                )
-            then
+            if not cachePendingPost(false, form.location, duration.value, quantity.value, bidParam, buyoutParam) then
                 self:Notify("Post needs Blizzard's confirmation, but the AH confirmation frame is unavailable.", true)
                 return false
             end

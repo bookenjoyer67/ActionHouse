@@ -325,6 +325,26 @@ local bidResults = {
 
 local calls = {}
 
+local function pendingPostFrame(commodity)
+    return {
+        CachePendingPost = function(_, location, duration, quantity, bid, buyout)
+            calls.cachePendingPost = {
+                commodity = commodity,
+                location = location,
+                duration = duration,
+                quantity = quantity,
+                bid = bid,
+                buyout = buyout,
+            }
+        end,
+    }
+end
+
+_G.AuctionHouseFrame = {
+    CommoditiesSellFrame = pendingPostFrame(true),
+    ItemSellFrame = pendingPostFrame(false),
+}
+
 C_AuctionHouse = {
     IsThrottledMessageSystemReady = function()
         return true
@@ -847,10 +867,37 @@ postItemNeedsConfirmation = true
 ns.UI.sellForm:Key("Enter")
 postItemNeedsConfirmation = false
 check("item post sent", calls.postItem ~= nil)
-check("item post confirmed", calls.confirmPostItem ~= nil)
+check("item post not confirmed by addon", calls.confirmPostItem == nil)
+check("item post handed to confirmation frame", calls.cachePendingPost ~= nil)
 check("item post no confirmation overlay", not ns.UI.confirm:IsShown())
+check(
+    "item post cache duration matches",
+    calls.cachePendingPost and calls.postItem and calls.cachePendingPost.duration == calls.postItem.duration,
+    calls.cachePendingPost and calls.cachePendingPost.duration
+)
+check(
+    "item post cache quantity matches",
+    calls.cachePendingPost and calls.postItem and calls.cachePendingPost.quantity == calls.postItem.quantity,
+    calls.cachePendingPost and calls.cachePendingPost.quantity
+)
+check(
+    "item post cache bid matches",
+    calls.cachePendingPost and calls.postItem and calls.cachePendingPost.bid == calls.postItem.bid,
+    calls.cachePendingPost and calls.cachePendingPost.bid
+)
+check(
+    "item post cache buyout matches",
+    calls.cachePendingPost and calls.postItem and calls.cachePendingPost.buyout == calls.postItem.buyout,
+    calls.cachePendingPost and calls.cachePendingPost.buyout
+)
 check("item post duration", calls.postItem and calls.postItem.duration == 2, calls.postItem and calls.postItem.duration)
 check("item post buyout", calls.postItem and calls.postItem.buyout == 300000, calls.postItem and calls.postItem.buyout)
+check("item sell form waiting on client", ns.UI.sellForm:IsShown())
+check(
+    "item post confirm notify",
+    type(ns.UI.messageText) == "string" and ns.UI.messageText:find("Confirm", 1, true) ~= nil,
+    ns.UI.messageText
+)
 ns.Sell:OnEvent("AUCTION_HOUSE_AUCTION_CREATED")
 check("item sell form closed", not ns.UI.sellForm:IsShown())
 

@@ -44,8 +44,11 @@ jobs:
           make -C lua-5.1.5 posix
           echo "$PWD/lua-5.1.5/src" >> "$GITHUB_PATH"
 
-      - name: Unit suite
-        run: lua tests/run.lua
+      - name: Tests
+        run: |
+          set -euo pipefail
+          lua tests/run.lua
+          lua tests/smoke_ui.lua
 
       - name: CurseForge token missing
         if: env.CF_API_TOKEN == ''
