@@ -24,6 +24,7 @@ This build is for Forever only. It does not target retail or other Classic clien
 
 - `/ahv` — show or hide ActionHouse.
 - Open the auction house — ActionHouse opens automatically by default.
+- `/` — search; a grey suffix previews a recent search, `Tab` accepts it, `Shift-Tab` restores the previous prefix.
 - `:blizzard` — hide ActionHouse and return to Blizzard's auction house.
 - `/ahv demo` — try every screen with fixture data. Demo mode never sends real auction house actions.
 - `/ahv status` — show load, query, throttle, and UI diagnostics.
@@ -53,8 +54,17 @@ Type `?` in the window for the full keymap, or `:help`.
 - Owned auctions with status, cancel fee, and cancellation.
 - Active bids with raise-bid and buyout actions.
 
+### Cheap Upgrades
+
+- When the Cheap Upgrades addon is installed, an **Upgrades** tab shows its suggested gear upgrades.
+- Results are read from Cheap Upgrades; ActionHouse does not start scans or send extra auction house queries.
+- Each row shows the watched spec(s) it upgrades and the equipped item it replaces. Hold `Shift` to show the normal Blizzard item comparison for the selected or hovered upgrade.
+- Filter or sort by spec, and press `Enter` on an upgrade to search for that item in Buy. Scan from `/cu` first if the list is empty.
+
 ### Interface
 
+- Item icons in every list row.
+- Search history with grey inline suggestions in the `/` prompt: `Tab` accepts, `Shift-Tab` restores the previous prefix.
 - Vim-style navigation and counts (`5j`, `gg`, `G`, `Ctrl-d`, `Ctrl-u`).
 - Visual mode for selecting rows.
 - Search, local filters (`quality=epic qty>=20 -bound`), and sorting.
@@ -110,6 +120,7 @@ Exact behavior depends on the active tab; press `?` in game for the contextual h
 | `:back` | leave item detail or the sell form |
 | `:refresh` | refresh the current view |
 | `:more` | load more buy results |
+| `:upgrades` | Cheap Upgrades suggestions (when installed) |
 | `:tab <name>` | switch tab |
 | `:b` / `:blizzard` | return to Blizzard's auction house |
 | `:q` | close ActionHouse and the auction house |

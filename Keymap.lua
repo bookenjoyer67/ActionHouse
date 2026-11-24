@@ -25,8 +25,9 @@ local function handle_pending(token)
     if sequence == "gg" then
         state:SetCursor(count > 1 and count or 1)
     elseif sequence == "gt" then
-        if count > 1 and count <= #ns.State.TABS then
-            ui:SetTab(ns.State.TABS[count])
+        local tabs = ui.GetTabs and ui:GetTabs() or ns.State.TABS
+        if count > 1 and count <= #tabs then
+            ui:SetTab(tabs[count])
         else
             ui:NextTab(1)
         end

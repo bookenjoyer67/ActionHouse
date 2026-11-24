@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Show which watched specs each Upgrades item improves and which equipped item it replaces. Hold Shift to show Blizzard's normal item comparison for the selected or hovered upgrade.
+- Preview recent searches as grey inline text in the `/` prompt; Tab accepts, Shift-Tab restores the previous prefix. `/`, `:search`, `*`/`#`, and Upgrades Enter searches share the history.
+- Show item icons in Buy, Sell, Owned, Bids, and Upgrades list rows.
+- Add a Cheap Upgrades tab when the Cheap Upgrades addon is installed; it reads its results without running scans.
+- Keep the Sell cursor on the adjacent row after posting instead of jumping to the top.
 - Close the auction house before `ReloadUI` runs, so the first `/reload` clears a stuck auction house throttle instead of needing a second reload or a logout.
 - Detect Forever's stuck auction house throttle (`IsThrottledMessageSystemReady` stuck `false`) and surface `thr: STUCK` with a reload/reset instruction instead of waiting forever.
 - Add `:throttle reset` and `:reload` to safely close the AH and reload the UI.

@@ -62,6 +62,7 @@ function UI:Init()
     end
     self:CreateFrame()
     self:CreateKeyCatcher()
+    self:RefreshTabs()
     self:UpdateStatus()
 end
 
@@ -94,6 +95,9 @@ function UI:CreateFrame()
     frame:EnableMouse(true)
     frame:SetScript("OnMouseDown", function()
         self:FocusKeys()
+    end)
+    frame:SetScript("OnUpdate", function(_, elapsed)
+        self:OnUpdate(elapsed)
     end)
     frame:Hide()
 
@@ -186,7 +190,12 @@ function UI:CreateFrame()
 
     self.tabButtons = {}
     local previous
-    for index, tab in ipairs(ns.State.TABS) do
+    local tabs = {}
+    for _, tab in ipairs(ns.State.TABS) do
+        tabs[#tabs + 1] = tab
+    end
+    tabs[#tabs + 1] = "upgrades"
+    for index, tab in ipairs(tabs) do
         local button = CreateFrame("Button", nil, tabBar)
         button:SetSize(90, 22)
         if previous then
@@ -444,16 +453,61 @@ function UI:ColumnsForTab()
     return columns[self.state.tab] or columns.buy
 end
 
+function UI:TabAvailable(tab)
+    if tab == "upgrades" then
+        return ns.Upgrades ~= nil and ns.Upgrades:Available() and not (self.state and self.state.demo)
+    end
+    return ns.State.TAB_LABELS[tab] ~= nil
+end
+
+function UI:GetTabs()
+    local tabs = {}
+    for _, tab in ipairs(ns.State.TABS) do
+        tabs[#tabs + 1] = tab
+    end
+    if self:TabAvailable("upgrades") then
+        tabs[#tabs + 1] = "upgrades"
+    end
+    return tabs
+end
+
+function UI:RefreshTabs()
+    if not self.tabButtons then
+        return
+    end
+    for tab, button in pairs(self.tabButtons) do
+        if tab == "upgrades" then
+            button:SetShown(self:TabAvailable(tab))
+        end
+    end
+    if self.state and self.state.tab == "upgrades" and not self:TabAvailable("upgrades") then
+        self.state:SetTab("buy")
+    end
+end
+
 local function defaultSortFor(tab)
     if tab == "sell" then
         return "name", true
     elseif tab == "owned" or tab == "bids" then
         return "time", true
+    elseif tab == "upgrades" then
+        return "rank", true
     end
     return "price", true
 end
 
 function UI:SetTab(tab)
+    self:ClearShiftComparison()
+    self.hoverUpgrade = nil
+    self.hoverUpgradeRow = nil
+    if not self:TabAvailable(tab) then
+        if tab == "upgrades" then
+            self:SetMessage("CheapUpgrades is not installed.", true)
+        else
+            self:SetMessage("Unknown tab: " .. tostring(tab), true)
+        end
+        return
+    end
     if not self.state:SetTab(tab) then
         self:SetMessage("Unknown tab: " .. tostring(tab), true)
         return
@@ -470,12 +524,19 @@ function UI:SetTab(tab)
     self.state.sort.field = field
     self.state.sort.asc = asc
 
+    if tab == "upgrades" and ns.Upgrades then
+        ns.Upgrades:EnsureLoaded()
+    end
     self:LoadRows(true)
+    if tab == "upgrades" and ns.Upgrades then
+        self.upgradesSig = ns.Upgrades:Signature()
+    end
     local hints = {
         buy = "Buy: / search, Enter drill, b bid, B buyout.",
         sell = "Sell: select a bag item, p to post.",
         owned = "Owned: x cancel, r refresh.",
         bids = "Bids: Enter/b raise, B buyout, r refresh.",
+        upgrades = "Upgrades: Enter searches Buy, r refreshes. Scan from /cu.",
     }
     self:SetMessage(hints[tab] or ("Tab: " .. ns.State.TAB_LABELS[self.state.tab]))
     self:Refresh()
@@ -489,22 +550,27 @@ function UI:SetTab(tab)
             ns.Manage:RefreshBids()
         end
     end
+    self:RefreshTabs()
 end
 
 function UI:NextTab(delta)
+    local tabs = self:GetTabs()
     local index = self.state:TabIndex() + (delta or 1)
-    while index > #ns.State.TABS do
-        index = index - #ns.State.TABS
+    while index > #tabs do
+        index = index - #tabs
     end
     while index < 1 do
-        index = index + #ns.State.TABS
+        index = index + #tabs
     end
-    self:SetTab(ns.State.TABS[index])
+    self:SetTab(tabs[index])
 end
 
 function UI:LoadRows(reset)
     reset = reset ~= false
-    if self.state.demo then
+    if self.state.demo and self.state.tab == "upgrades" then
+        self.state.live = false
+        self.state:SetRows({}, reset)
+    elseif self.state.demo then
         self.state.live = false
         self.state:SetRows(ns.Demo.GetRows(self.state.tab), reset)
     elseif self.state.tab == "buy" then
@@ -519,6 +585,9 @@ function UI:LoadRows(reset)
     elseif self.state.tab == "bids" then
         self.state.live = false
         self.state:SetRows(ns.Manage:GetBidRows(), reset)
+    elseif self.state.tab == "upgrades" then
+        self.state.live = false
+        self.state:SetRows(ns.Upgrades and ns.Upgrades:GetRows() or {}, reset)
     end
 end
 
@@ -613,6 +682,25 @@ function UI:RefreshDetails()
         if row.minBid and row.minBid > 0 then
             bits[#bits + 1] = "next bid " .. ns.Money.Format(row.minBid)
         end
+    elseif row.view == "upgrade" then
+        if row.specFullText and row.specFullText ~= "" then
+            bits[#bits + 1] = "spec " .. row.specFullText
+        end
+        if row.slot and row.slot ~= "" then
+            bits[#bits + 1] = row.slot
+        end
+        if row.upgradeText and row.upgradeText ~= "" then
+            bits[#bits + 1] = row.upgradeText
+        end
+        if row.reqLevel and row.reqLevel > 0 then
+            bits[#bits + 1] = "req " .. tostring(row.reqLevel)
+        end
+        if row.cost and row.price and row.cost ~= row.price then
+            bits[#bits + 1] = "cost " .. ns.Money.Format(row.cost)
+        end
+        if row.sell and row.sell > 0 then
+            bits[#bits + 1] = "vendor " .. ns.Money.Format(row.sell)
+        end
     end
     self.detail:SetText(table.concat(bits, "  ·  "))
     setColor(self.detail, COLORS.text)
@@ -671,6 +759,8 @@ function UI:UpdateStatus()
         throttle = ns.Manage:GetThrottleLabel()
     elseif not self.state.demo and tab == "sell" then
         throttle = ns.Sell:IsPriceQueryPending() and "thr: price" or "thr: local"
+    elseif not self.state.demo and tab == "upgrades" and ns.Upgrades then
+        throttle = ns.Upgrades:StatusLabel()
     else
         throttle = throttleLabel()
     end
@@ -729,6 +819,29 @@ function UI:UpdateStatus()
     end
 end
 
+function UI:OnUpdate(elapsed)
+    if not self.state or self.state.tab ~= "upgrades" or self.state.demo then
+        self:ClearShiftComparison()
+        return
+    end
+    if not self.frame or not self.frame:IsShown() or not ns.Upgrades then
+        self:ClearShiftComparison()
+        return
+    end
+    self:UpdateShiftComparison()
+    self.upgradesPoll = (self.upgradesPoll or 0) + (elapsed or 0)
+    if self.upgradesPoll < 0.5 then
+        return
+    end
+    self.upgradesPoll = 0
+    local signature = ns.Upgrades:Signature()
+    if signature ~= self.upgradesSig then
+        self.upgradesSig = signature
+        self:LoadRows(false)
+        self:Refresh()
+    end
+end
+
 function UI:GetRowsVisible()
     if self.list then
         return self.list:GetRowsVisible()
@@ -756,6 +869,38 @@ function UI:OpenCommand()
     end)
 end
 
+local SEARCH_HISTORY_LIMIT = 20
+
+function UI:RememberSearch(text)
+    local prompt = ns.UI.Prompt
+    if prompt and prompt.AppendHistory then
+        prompt.AppendHistory("search", text)
+    end
+end
+
+function UI:SearchHistoryMatches(text)
+    local prompt = ns.UI.Prompt
+    local history = prompt and prompt.GetHistory and prompt.GetHistory("search") or {}
+    local current = tostring(text or "")
+    local needle = current:gsub("^%s+", ""):gsub("%s+$", ""):lower()
+    local results = {}
+    local seen = {}
+    for index = #history, 1, -1 do
+        local entry = tostring(history[index] or "")
+        local key = entry:lower()
+        if entry ~= "" and entry ~= current and not seen[key] then
+            if needle == "" or key:sub(1, #needle) == needle then
+                seen[key] = true
+                results[#results + 1] = entry
+                if #results >= SEARCH_HISTORY_LIMIT then
+                    break
+                end
+            end
+        end
+    end
+    return results
+end
+
 function UI:OpenSearch()
     self:Init()
     if not self:IsShown() then
@@ -764,7 +909,9 @@ function UI:OpenSearch()
     if self:IsLive() then
         self.prompt:Open("/", ns.Auction:GetQueryText(), "search", function(text)
             ns.Auction:Search(text)
-        end)
+        end, function(text)
+            return self:SearchHistoryMatches(text)
+        end, nil, true)
         return
     end
     self.prompt:Open("/", self.state.search, "search", function(text)
@@ -772,10 +919,13 @@ function UI:OpenSearch()
         self.state.cursor = 1
         self:SetMessage(text == "" and "Search cleared." or ("Search: " .. text))
         self:Refresh()
-    end)
+    end, function(text)
+        return self:SearchHistoryMatches(text)
+    end, nil, true)
 end
 
 function UI:SetSearch(text)
+    self:RememberSearch(text)
     if self:IsLive() then
         ns.Auction:Search(text)
         return
@@ -829,16 +979,18 @@ function UI:ShowDemo(tab)
     self.state.live = false
     self.state.keytest = false
     self.state.paused = false
-    if tab then
-        if not self.state:SetTab(tab) then
-            self.state:SetTab("buy")
-        end
+    if not tab or tab == "upgrades" or not self:TabAvailable(tab) then
+        tab = "buy"
+    end
+    if not self.state:SetTab(tab) then
+        self.state:SetTab("buy")
     end
     self.state.mode = "NORMAL"
     self:LoadRows()
     self.frame:Show()
     self:SetMessage("Demo mode: fixtures only. y/n confirmations work; no AH actions are sent.")
     self:Refresh()
+    self:RefreshTabs()
     self:FocusKeys()
 end
 
@@ -877,6 +1029,7 @@ function UI:ShowReal()
         self:SetMessage("Live Buy. Press / to search; Enter drills in; b bid; B buyout.")
     end
     self:Refresh()
+    self:RefreshTabs()
     self:FocusKeys()
 end
 
@@ -916,6 +1069,7 @@ function UI:StartKeytest()
     self.frame:Show()
     self:SetMessage("Key test: press keys. Esc exits. The log is saved to ActionHouseDB.")
     self:Refresh()
+    self:RefreshTabs()
     self:FocusKeys()
 end
 
@@ -1314,6 +1468,9 @@ function UI:RefreshAll()
         ns.Manage:RefreshOwned()
     elseif self.state.tab == "bids" then
         ns.Manage:RefreshBids()
+    elseif self.state.tab == "upgrades" and ns.Upgrades then
+        ns.Upgrades:Refresh()
+        self:SetMessage(ns.Upgrades:StatusLabel())
     end
 end
 
@@ -1381,6 +1538,120 @@ function UI:RepeatLast()
     self:DemoAction(self.lastAction.action, self.lastAction.count)
 end
 
+local function shiftDown()
+    local isShift = rawget(_G, "IsShiftKeyDown")
+    if type(isShift) ~= "function" then
+        return false
+    end
+    local ok, down = pcall(isShift)
+    return ok and down and true or false
+end
+
+local function setItemComparison(tooltip, compare)
+    if compare then
+        local show = rawget(_G, "GameTooltip_ShowCompareItem")
+        if type(show) == "function" then
+            pcall(show, tooltip)
+        end
+    else
+        local hide = rawget(_G, "GameTooltip_HideShoppingTooltips")
+        if type(hide) == "function" then
+            pcall(hide, tooltip)
+        end
+    end
+end
+
+function UI:ShowUpgradeTooltip(row, owner)
+    local tooltip = rawget(_G, "GameTooltip")
+    if not tooltip or not row or not row.itemLink then
+        return
+    end
+    tooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    local linked = pcall(tooltip.SetHyperlink, tooltip, row.itemLink)
+    if not linked then
+        tooltip:AddLine(tostring(row.name or "?"))
+    end
+    tooltip:Show()
+    setItemComparison(tooltip, shiftDown())
+end
+
+function UI:ClearShiftComparison()
+    if self.shiftTooltipRow then
+        self.shiftTooltipRow = nil
+        local tooltip = rawget(_G, "GameTooltip")
+        if tooltip then
+            local hide = rawget(_G, "GameTooltip_HideShoppingTooltips")
+            if type(hide) == "function" then
+                pcall(hide, tooltip)
+            end
+            tooltip:Hide()
+        end
+    end
+end
+
+function UI:UpdateShiftComparison()
+    if not self.frame or not self.frame:IsShown() or not self.state or self.state.tab ~= "upgrades" or self.state.demo then
+        self:ClearShiftComparison()
+        return
+    end
+
+    local shift = shiftDown()
+    local hover = self.hoverUpgrade
+    local stateChanged = shift ~= self.shiftCompareState
+    self.shiftCompareState = shift
+
+    if hover then
+        self.shiftTooltipRow = nil
+        if stateChanged and self.hoverUpgradeRow then
+            self:ShowUpgradeTooltip(hover, self.hoverUpgradeRow)
+        end
+        return
+    end
+
+    if
+        not shift
+        or (self.prompt and self.prompt:IsShown())
+        or (self.confirm and self.confirm:IsShown())
+        or (self.help and self.help:IsShown())
+        or (self.sellForm and self.sellForm:IsShown())
+    then
+        self:ClearShiftComparison()
+        return
+    end
+    local row = self.state:GetSelected()
+    if not row or row.view ~= "upgrade" or not row.itemLink then
+        self:ClearShiftComparison()
+        return
+    end
+    if self.shiftTooltipRow == row then
+        return
+    end
+    self:ClearShiftComparison()
+    local rowFrame
+    if self.list and self.list.rowFrames and self.list.state then
+        local index = self.state.cursor - self.state.top + 1
+        rowFrame = self.list.rowFrames[index]
+    end
+    self.shiftTooltipRow = row
+    self:ShowUpgradeTooltip(row, rowFrame or self.frame)
+end
+
+function UI:SearchUpgrade(row)
+    if not row or not row.name or row.name == "" then
+        self:SetMessage("No upgrade selected.", true)
+        return
+    end
+    if not ns.Compat or not ns.Compat:IsAuctionHouseOpen() then
+        self:SetMessage("Open the auction house first.", true)
+        return
+    end
+    local name = row.name
+    self:RememberSearch(name)
+    self:SetTab("buy")
+    ns.Auction:Search(name)
+    self:SetMessage("Searching Buy for " .. name)
+end
+
 function UI:PrimaryAction(action, count)
     if self.state.demo then
         if action then
@@ -1393,6 +1664,15 @@ function UI:PrimaryAction(action, count)
 
     local tab = self.state.tab
     local row = self.state:GetSelected()
+
+    if tab == "upgrades" then
+        if action ~= nil then
+            self:SetMessage("Upgrades: Enter searches Buy for the selected item.", true)
+            return
+        end
+        self:SearchUpgrade(row)
+        return
+    end
 
     if tab == "buy" then
         if not self:IsLive() then
@@ -1490,6 +1770,7 @@ function UI:SearchSelected()
         self:SetMessage("No row selected.", true)
         return
     end
+    self:RememberSearch(row.name or "")
     if self:IsLive() then
         ns.Auction:Search(row.name or "")
         return
@@ -1520,6 +1801,9 @@ function UI:CloseAH()
 end
 
 function UI:Hide()
+    self:ClearShiftComparison()
+    self.hoverUpgrade = nil
+    self.hoverUpgradeRow = nil
     if self.sellForm and self.sellForm:IsShown() then
         self.sellForm:Hide()
     end

@@ -57,18 +57,18 @@ end
 local function itemDetails(itemID, itemLink)
     local meta = ns.Auction and ns.Auction:GetItemMeta(itemID)
     if meta then
-        return meta.name, meta.quality, meta.link or itemLink
+        return meta.name, meta.quality, meta.link or itemLink, meta.icon
     end
 
     local getInfo = _G.C_Item and _G.C_Item.GetItemInfo or _G.GetItemInfo
     if type(getInfo) == "function" then
         local values = { pcall(getInfo, itemLink or itemID) }
         if values[1] and values[2] then
-            return values[2], values[4] or 1, values[3] or itemLink
+            return values[2], values[4] or 1, values[3] or itemLink, values[11]
         end
     end
 
-    return itemNameFromLink(itemLink) or ("Item " .. tostring(itemID or "?")), 1, itemLink
+    return itemNameFromLink(itemLink) or ("Item " .. tostring(itemID or "?")), 1, itemLink, nil
 end
 
 local function formatSeconds(seconds)
@@ -133,6 +133,7 @@ function Manage:Init()
         "BIDS_UPDATED",
         "AUCTION_CANCELED",
         "AUCTION_HOUSE_NEW_BID_RECEIVED",
+        "GET_ITEM_INFO_RECEIVED",
         "UI_ERROR_MESSAGE",
     }) do
         pcall(self.frame.RegisterEvent, self.frame, event)
@@ -318,7 +319,7 @@ function Manage:BuildOwnedRows()
     for index = 1, count do
         local infoOk, info = call("GetOwnedAuctionInfo", index)
         if infoOk and type(info) == "table" and info.itemKey then
-            local name, quality, link = itemDetails(info.itemKey.itemID, info.itemLink)
+            local name, quality, link, icon = itemDetails(info.itemKey.itemID, info.itemLink)
             local canCancel = false
             if info.status ~= 1 and info.auctionID then
                 local cancelOk, cancel = call("CanCancelAuction", info.auctionID)
@@ -348,6 +349,7 @@ function Manage:BuildOwnedRows()
                 itemLink = link or info.itemLink,
                 name = name,
                 quality = quality or 1,
+                icon = icon,
                 qty = tonumber(info.quantity) or 1,
                 price = tonumber(info.bidAmount) or 0,
                 bidAmount = tonumber(info.bidAmount) or 0,
@@ -394,7 +396,7 @@ function Manage:BuildBidRows()
     local guid = playerGUID()
     for _, info in ipairs(self:GetAllBids()) do
         if type(info) == "table" and info.itemKey then
-            local name, quality, link = itemDetails(info.itemKey.itemID, info.itemLink)
+            local name, quality, link, icon = itemDetails(info.itemKey.itemID, info.itemLink)
             local qty = quantityForAuction(info.auctionID)
             local bidder = info.bidder
             local playerName = UnitName and UnitName("player") or nil
@@ -416,6 +418,7 @@ function Manage:BuildBidRows()
                 itemLink = link or info.itemLink,
                 name = name,
                 quality = quality or 1,
+                icon = icon,
                 qty = qty,
                 price = tonumber(info.bidAmount) or tonumber(info.minBid) or 0,
                 bidAmount = tonumber(info.bidAmount) or 0,
@@ -600,6 +603,33 @@ function Manage:OnEvent(event, ...)
 
     if event == "AUCTION_HOUSE_NEW_BID_RECEIVED" then
         self:ScheduleCurrentRefresh()
+        return
+    end
+
+    if event == "GET_ITEM_INFO_RECEIVED" then
+        if not self.active or self.metaRefresh then
+            return
+        end
+        self.metaRefresh = true
+        C_Timer.After(0, function()
+            self.metaRefresh = nil
+            if not self.active then
+                return
+            end
+            local tab = ns.UI and ns.UI.state and ns.UI.state.tab
+            if #self.ownedRows > 0 then
+                self:BuildOwnedRows()
+                if tab == "owned" then
+                    self:Changed("owned", false)
+                end
+            end
+            if #self.bidRows > 0 then
+                self:BuildBidRows()
+                if tab == "bids" then
+                    self:Changed("bids", false)
+                end
+            end
+        end)
         return
     end
 

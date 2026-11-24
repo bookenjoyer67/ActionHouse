@@ -22,7 +22,7 @@ local COMMANDS = {
         end,
         run = function(rest)
             local tab = rest ~= "" and rest or "buy"
-            if not ns.State.TAB_LABELS[tab] then
+            if tab == "upgrades" or not ns.State.TAB_LABELS[tab] then
                 ns.UI:SetMessage("Unknown demo tab: " .. tab, true)
                 return
             end
@@ -236,14 +236,17 @@ local COMMANDS = {
     },
     {
         name = "tab",
-        usage = "tab <buy|sell|owned|bids>",
+        usage = "tab <buy|sell|owned|bids|upgrades>",
         desc = "Switch tabs.",
         complete = function()
+            if ns.UI and ns.UI.GetTabs then
+                return ns.UI:GetTabs()
+            end
             return { "buy", "sell", "owned", "bids" }
         end,
         run = function(rest)
             local tab = rest:lower()
-            if not ns.State.TAB_LABELS[tab] then
+            if not ns.State.TAB_LABELS[tab] or not ns.UI:TabAvailable(tab) then
                 ns.UI:SetMessage("Unknown tab: " .. rest, true)
                 return
             end
@@ -272,6 +275,19 @@ local COMMANDS = {
         desc = "Switch to the Bids tab.",
         run = function()
             ns.UI:SetTab("bids")
+        end,
+    },
+    {
+        name = "upgrades",
+        aliases = { "cu" },
+        usage = "upgrades",
+        desc = "Cheap Upgrades suggestions, when CheapUpgrades is installed.",
+        run = function()
+            if not ns.Upgrades or not ns.Upgrades:Available() then
+                ns.UI:SetMessage("CheapUpgrades is not installed.", true)
+                return
+            end
+            ns.UI:SetTab("upgrades")
         end,
     },
     {
@@ -335,10 +351,23 @@ local COMMANDS = {
     },
     {
         name = "sort",
-        usage = "sort <price|buyout|name|level|qty|time|status> [asc|desc]",
+        usage = "sort <price|buyout|name|level|qty|time|status|spec|replaces> [asc|desc]",
         desc = "Sort the current list.",
         complete = function()
-            return { "price", "buyout", "name", "level", "qty", "time", "status" }
+            return {
+                "price",
+                "buyout",
+                "name",
+                "level",
+                "qty",
+                "time",
+                "status",
+                "pct",
+                "slot",
+                "rank",
+                "spec",
+                "replaces",
+            }
         end,
         run = function(rest)
             local field, direction = rest:match("^(%S+)%s*(%S*)$")

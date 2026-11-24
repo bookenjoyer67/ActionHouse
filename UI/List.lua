@@ -8,6 +8,8 @@ ns.UI.List = List
 local ROW_HEIGHT = 18
 local MAX_ROWS = 120
 local GAP = 4
+local ICON_SIZE = 16
+local NAME_INDENT = ICON_SIZE + GAP
 
 local COLUMNS = {
     buy = {
@@ -43,6 +45,15 @@ local COLUMNS = {
         { key = "buyout", label = "BUYOUT", width = 0.14, align = "RIGHT" },
         { key = "time", label = "TIME", width = 0.10, align = "RIGHT" },
         { key = "status", label = "STATUS", width = 0.18, align = "LEFT" },
+    },
+    upgrades = {
+        { key = "index", label = "#", width = 0.05, align = "RIGHT" },
+        { key = "name", label = "ITEM", width = 0.33, align = "LEFT" },
+        { key = "slot", label = "SLOT", width = 0.10, align = "LEFT" },
+        { key = "spec", label = "SPEC", width = 0.12, align = "LEFT" },
+        { key = "replaces", label = "REPLACES", width = 0.18, align = "LEFT" },
+        { key = "upgrade", label = "UPGRADE", width = 0.08, align = "RIGHT" },
+        { key = "price", label = "PRICE", width = 0.14, align = "RIGHT" },
     },
 }
 
@@ -126,6 +137,17 @@ local function cellText(key, row, slot)
         return kindText(row.kind)
     elseif key == "status" then
         return tostring(row.status or "")
+    elseif key == "slot" then
+        return tostring(row.slot or "")
+    elseif key == "pct" then
+        local pct = tonumber(row.pct)
+        return pct and string.format("%+.0f%%", pct) or ""
+    elseif key == "spec" then
+        return shortText(row.specText, 28)
+    elseif key == "replaces" then
+        return shortText(row.replacesText, 36)
+    elseif key == "upgrade" then
+        return shortText(row.upgradeText, 14)
     end
     return tostring(row[key] or "")
 end
@@ -135,6 +157,19 @@ local function cellColor(key, row)
         return qualityColor(row.quality or 1)
     elseif key == "price" or key == "buyout" then
         return COLORS.gold[1], COLORS.gold[2], COLORS.gold[3]
+    elseif key == "pct" then
+        return COLORS.green[1], COLORS.green[2], COLORS.green[3]
+    elseif key == "slot" then
+        return COLORS.dim[1], COLORS.dim[2], COLORS.dim[3]
+    elseif key == "spec" then
+        return COLORS.gold[1], COLORS.gold[2], COLORS.gold[3]
+    elseif key == "replaces" then
+        return COLORS.dim[1], COLORS.dim[2], COLORS.dim[3]
+    elseif key == "upgrade" then
+        if (tonumber(row.gain) or 0) > 0 then
+            return COLORS.green[1], COLORS.green[2], COLORS.green[3]
+        end
+        return COLORS.red[1], COLORS.red[2], COLORS.red[3]
     elseif key == "status" then
         local status = tostring(row.status or ""):lower()
         if status == "sold" or status == "winning" or status == "ready" then
@@ -158,9 +193,10 @@ function List.CreateHeader(parent, spec)
     for index, column in ipairs(spec) do
         local text = header:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
         local cellWidth = width * column.width
-        text:SetPoint("TOPLEFT", header, "TOPLEFT", x + 6, 0)
-        text:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", x + 6, 0)
-        text:SetWidth(math.max(8, cellWidth - GAP))
+        local indent = column.key == "name" and NAME_INDENT or 0
+        text:SetPoint("TOPLEFT", header, "TOPLEFT", x + 6 + indent, 0)
+        text:SetPoint("BOTTOMLEFT", header, "BOTTOMLEFT", x + 6 + indent, 0)
+        text:SetWidth(math.max(8, cellWidth - GAP - indent))
         text:SetJustifyH(column.align or "LEFT")
         text:SetJustifyV("MIDDLE")
         text:SetWordWrap(false)
@@ -176,10 +212,11 @@ function List.CreateHeader(parent, spec)
         for index, column in ipairs(self.spec) do
             local text = self.texts[index]
             local cellWidth = total * column.width
+            local indent = column.key == "name" and NAME_INDENT or 0
             text:ClearAllPoints()
-            text:SetPoint("TOPLEFT", self, "TOPLEFT", offset + 6, 0)
-            text:SetPoint("BOTTOMLEFT", self, "BOTTOMLEFT", offset + 6, 0)
-            text:SetWidth(math.max(8, cellWidth - GAP))
+            text:SetPoint("TOPLEFT", self, "TOPLEFT", offset + 6 + indent, 0)
+            text:SetPoint("BOTTOMLEFT", self, "BOTTOMLEFT", offset + 6 + indent, 0)
+            text:SetWidth(math.max(8, cellWidth - GAP - indent))
             offset = offset + cellWidth
         end
     end
@@ -232,14 +269,19 @@ function List:LayoutRow(row)
             row.texts[index] = text
         end
         local cellWidth = total * column.width
+        local indent = column.key == "name" and NAME_INDENT or 0
         text:ClearAllPoints()
-        text:SetPoint("TOPLEFT", row, "TOPLEFT", 6 + offset, 0)
-        text:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 6 + offset, 0)
-        text:SetWidth(math.max(8, cellWidth - GAP))
+        text:SetPoint("TOPLEFT", row, "TOPLEFT", 6 + offset + indent, 0)
+        text:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 6 + offset + indent, 0)
+        text:SetWidth(math.max(8, cellWidth - GAP - indent))
         text:SetJustifyH(column.align or "LEFT")
         text:SetJustifyV("MIDDLE")
         text:SetWordWrap(false)
         text:Show()
+        if column.key == "name" and row.icon then
+            row.icon:ClearAllPoints()
+            row.icon:SetPoint("LEFT", row, "LEFT", 6 + offset, 0)
+        end
         offset = offset + cellWidth
     end
     for index = #self.columns + 1, #row.texts do
@@ -265,6 +307,11 @@ function List:CreateRow(index)
     row.selection:SetColorTexture(COLORS.selection[1], COLORS.selection[2], COLORS.selection[3], COLORS.selection[4])
     row.selection:Hide()
 
+    row.icon = row:CreateTexture(nil, "ARTWORK")
+    row.icon:SetSize(ICON_SIZE, ICON_SIZE)
+    row.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+    row.icon:Hide()
+
     row.texts = {}
     for columnIndex = 1, #self.columns do
         row.texts[columnIndex] = row:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
@@ -284,6 +331,31 @@ function List:CreateRow(index)
             if ns.UI and ns.UI.FocusKeys then
                 ns.UI:FocusKeys()
             end
+        end
+    end)
+
+    row:SetScript("OnEnter", function()
+        local dataIndex = row.dataIndex
+        local data = dataIndex and self.state.rows[dataIndex]
+        if ns.UI then
+            ns.UI.hoverUpgrade = data
+            ns.UI.hoverUpgradeRow = row
+        end
+        if data and data.view == "upgrade" and data.itemLink and ns.UI and ns.UI.ShowUpgradeTooltip then
+            ns.UI:ShowUpgradeTooltip(data, row)
+        end
+    end)
+
+    row:SetScript("OnLeave", function()
+        local dataIndex = row.dataIndex
+        local data = dataIndex and self.state.rows[dataIndex]
+        if ns.UI and ns.UI.hoverUpgrade == data then
+            ns.UI.hoverUpgrade = nil
+            ns.UI.hoverUpgradeRow = nil
+        end
+        local tooltip = rawget(_G, "GameTooltip")
+        if tooltip then
+            tooltip:Hide()
         end
     end)
 
@@ -348,6 +420,14 @@ function List:Refresh()
                 row.selection:Show()
             else
                 row.selection:Hide()
+            end
+
+            local icon = ns.ItemIcon and ns.ItemIcon(data.itemID, data.itemLink, data.icon)
+            if icon then
+                row.icon:SetTexture(icon)
+                row.icon:Show()
+            else
+                row.icon:Hide()
             end
 
             for columnIndex, column in ipairs(self.columns) do

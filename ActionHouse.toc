@@ -8,6 +8,7 @@
 ## X-Website: https://www.curseforge.com/wow/addons/actionhouse
 ## SavedVariables: ActionHouseDB
 ## SavedVariablesPerCharacter: ActionHouseCharDB
+## OptionalDeps: CheapUpgrades
 ## IconTexture: Interface\Icons\INV_Misc_Coin_01
 ## Category: Auction House
 ## X-Category: Auctions
@@ -17,11 +18,13 @@
 Compat.lua
 Util/Money.lua
 Util/Keys.lua
+Util/Icons.lua
 State.lua
 Demo.lua
 Auction.lua
 Sell.lua
 Manage.lua
+Upgrades.lua
 UI/List.lua
 UI/Prompt.lua
 UI/Help.lua

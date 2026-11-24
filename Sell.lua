@@ -640,7 +640,8 @@ function Sell:GetBagLocation(bag, slot)
     return location
 end
 
-function Sell:RefreshBags()
+function Sell:RefreshBags(reset)
+    local shouldReset = reset == true
     if not self.active then
         return
     end
@@ -648,7 +649,7 @@ function Sell:RefreshBags()
     local container = rawget(_G, "C_Container")
     if not container then
         self.rows = {}
-        self:Changed(true)
+        self:Changed(shouldReset)
         return
     end
 
@@ -706,7 +707,7 @@ function Sell:RefreshBags()
     end)
 
     self.rows = rows
-    self:Changed(true)
+    self:Changed(shouldReset)
 end
 
 function Sell:ScheduleBagRefresh()
@@ -717,7 +718,7 @@ function Sell:ScheduleBagRefresh()
     local token = self.bagRefreshToken
     C_Timer.After(0.15, function()
         if self.bagRefreshToken == token and self.active and not self.posting then
-            self:RefreshBags()
+            self:RefreshBags(false)
         end
     end)
 end

@@ -10,7 +10,18 @@ State.TAB_LABELS = {
     sell = "Sell",
     owned = "Owned",
     bids = "Bids",
+    upgrades = "Upgrades",
 }
+
+local function availableTabs()
+    if ns.UI and type(ns.UI.GetTabs) == "function" then
+        local ok, tabs = pcall(ns.UI.GetTabs, ns.UI)
+        if ok and type(tabs) == "table" and #tabs > 0 then
+            return tabs
+        end
+    end
+    return State.TABS
+end
 
 local function clamp(value, low, high)
     if value < low then
@@ -52,7 +63,7 @@ function State.New()
 end
 
 function State:TabIndex()
-    for index, tab in ipairs(State.TABS) do
+    for index, tab in ipairs(availableTabs()) do
         if tab == self.tab then
             return index
         end
@@ -72,14 +83,15 @@ function State:SetTab(tab)
 end
 
 function State:NextTab(delta)
+    local tabs = availableTabs()
     local index = self:TabIndex() + (delta or 1)
-    while index > #State.TABS do
-        index = index - #State.TABS
+    while index > #tabs do
+        index = index - #tabs
     end
     while index < 1 do
-        index = index + #State.TABS
+        index = index + #tabs
     end
-    return self:SetTab(State.TABS[index])
+    return self:SetTab(tabs[index])
 end
 
 local function freeTextMatches(row, needle)
@@ -90,6 +102,12 @@ local function freeTextMatches(row, needle)
         return true
     end
     if lower(row.seller):find(needle, 1, true) then
+        return true
+    end
+    if lower(row.specText):find(needle, 1, true) then
+        return true
+    end
+    if lower(row.replacesText):find(needle, 1, true) then
         return true
     end
     return false
@@ -191,6 +209,16 @@ local function sortValue(row, field)
         return lower(row.name)
     elseif field == "status" then
         return lower(row.status)
+    elseif field == "pct" then
+        return tonumber(row.pct) or 0
+    elseif field == "slot" then
+        return lower(row.slot)
+    elseif field == "rank" then
+        return tonumber(row.rank) or 0
+    elseif field == "spec" then
+        return lower(row.specText)
+    elseif field == "replaces" then
+        return lower(row.replacesText)
     end
     return row[field]
 end
