@@ -382,6 +382,18 @@ function Sell:RequestPrice(form, isRetry)
         return false
     end
 
+    if not form.itemKeyInfo then
+        local infoOk, info = call("GetItemKeyInfo", form.itemKey)
+        if infoOk and type(info) == "table" then
+            form.itemKeyInfo = info
+        else
+            if not isRetry then
+                self:SchedulePriceRetry(form)
+            end
+            return false
+        end
+    end
+
     local auction = ns.Auction
     if not auction or type(auction.CanQuery) ~= "function" then
         return false
@@ -402,7 +414,14 @@ function Sell:RequestPrice(form, isRetry)
         sorts = { { sortOrder = enumSort("Buyout", 4), reverseSort = false } }
     end
 
-    local sent, sendErr = call("SendSearchQuery", form.itemKey, sorts, false)
+    local sendName = "SendSearchQuery"
+    local splitOwned = false
+    if not form.commodity and form.itemKeyInfo and form.itemKeyInfo.isEquipment then
+        sendName = "SendSellSearchQuery"
+        splitOwned = true
+    end
+
+    local sent, sendErr = call(sendName, form.itemKey, sorts, splitOwned)
     if not sent then
         form.priceLookup = "failed"
         form.priceQueryError = tostring(sendErr or "unknown")

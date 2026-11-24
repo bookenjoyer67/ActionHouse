@@ -108,9 +108,22 @@ local COMMANDS = {
     },
     {
         name = "throttle",
-        usage = "throttle",
-        desc = "Show auction house throttle status and recovery steps.",
-        run = function()
+        usage = "throttle [reset]",
+        desc = "Show throttle status, or close the AH and reload to clear a stuck throttle.",
+        complete = function()
+            return { "reset" }
+        end,
+        run = function(rest)
+            if rest:lower() == "reset" then
+                if type(_G.ReloadUI) == "function" then
+                    ns:Print("closing the auction house and reloading to reset the throttle...")
+                    _G.ReloadUI()
+                else
+                    ns:Print("ReloadUI is unavailable; use /reload.")
+                end
+                return
+            end
+
             local auction = ns.Auction
             if auction then
                 auction:Init()
@@ -131,9 +144,22 @@ local COMMANDS = {
                 )
             )
             if stuck then
-                ns:Print("The client throttle is frozen. Log out and back in; /reload may not clear it.")
+                ns:Print("Run :throttle reset to close the AH and reload.")
             elseif ready == false then
                 ns:Print("Waiting for the auction house throttle.")
+            end
+        end,
+    },
+    {
+        name = "reload",
+        aliases = { "rl" },
+        usage = "reload",
+        desc = "Close the auction house and reload the UI.",
+        run = function()
+            if type(_G.ReloadUI) == "function" then
+                _G.ReloadUI()
+            else
+                ns:Print("ReloadUI is unavailable; use /reload.")
             end
         end,
     },

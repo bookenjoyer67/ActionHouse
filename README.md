@@ -95,7 +95,8 @@ Exact behavior depends on the active tab; press `?` in game for the contextual h
 | `:demo [buy\|sell\|owned\|bids]` | fixture data, no real auction house actions |
 | `:live` | live Buy view while the auction house is open |
 | `:status` | diagnostics |
-| `:throttle` | throttle state and recovery steps |
+| `:throttle [reset]` | throttle state; `reset` closes the AH and reloads |
+| `:reload` | close the AH and reload the UI |
 | `:search <text>` | set search text |
 | `:filter <expr>` | local filter |
 | `:sort <field> [asc\|desc]` | sort |
@@ -133,8 +134,8 @@ ActionHouse does not add its own confirmation before posting. Press `Enter` or `
 
 Run `/ahv status` first. It prints the addon version, client build, auction state, throttle state, query state, and UI mode.
 
-- `thr: STUCK` means Forever's auction house throttle has frozen (`IsThrottledMessageSystemReady` stuck `false`). Log out and back in to reset it; `/reload` may not clear it.
-- `:throttle` prints the throttle state, how long it has been unavailable, and the recovery steps.
+- `thr: STUCK` means Forever's auction house throttle has frozen (`IsThrottledMessageSystemReady` stuck `false`). `/reload` now closes the AH first and clears it; `:throttle reset` does the same on demand.
+- `:throttle` prints the throttle state and how long it has been unavailable. `:throttle reset` closes the AH and reloads the UI.
 
 - `:probe` — dump client and API details to chat and `ActionHouseDB`.
 - `:probedump` — print the last saved probe.

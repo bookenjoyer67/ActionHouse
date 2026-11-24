@@ -131,7 +131,7 @@ local function showUsage()
     ns:Print("  :sell  :owned  :bids  :post  :cancel  :raise [money]  :price")
     ns:Print("  :search <text>  :filter <expr>  :sort <field> [asc|desc]  :set <key>=<value>")
     ns:Print("  :buy [qty]  :bid [money]  :messages  :version  :refresh  :more")
-    ns:Print("  :back  :tab <name>  :b / :blizzard  :q")
+    ns:Print("  :back  :tab <name>  :b / :blizzard  :q  :reload")
 end
 
 local events = CreateFrame("Frame")
@@ -228,6 +228,50 @@ events:SetScript("OnEvent", function(_, event, ...)
         end
     end
 end)
+
+local baseReloadUI = rawget(_G, "ReloadUI")
+local reloadQueued = false
+
+local function safeReloadUI(...)
+    local args = { ... }
+    if reloadQueued then
+        return
+    end
+    reloadQueued = true
+
+    local auction = ns.Auction
+    local ahOpen = false
+    if ns.Compat and ns.Compat.IsAuctionHouseOpen then
+        local ok, open = pcall(ns.Compat.IsAuctionHouseOpen, ns.Compat)
+        ahOpen = ok and open and true or false
+    end
+    if auction and auction.IsActive and auction:IsActive() then
+        ahOpen = true
+    end
+
+    if not ns.disabled and auction and auction.PrepareForReload then
+        pcall(auction.PrepareForReload, auction)
+    end
+
+    if ns.disabled or not ahOpen then
+        reloadQueued = false
+        if type(baseReloadUI) == "function" then
+            return baseReloadUI(unpack(args))
+        end
+        return
+    end
+
+    C_Timer.After(0.5, function()
+        reloadQueued = false
+        if type(baseReloadUI) == "function" then
+            baseReloadUI(unpack(args))
+        end
+    end)
+end
+
+if type(baseReloadUI) == "function" then
+    _G.ReloadUI = safeReloadUI
+end
 
 SLASH_ACTIONHOUSE1 = "/ahv"
 SLASH_ACTIONHOUSE2 = "/actionhouse"

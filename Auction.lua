@@ -8,7 +8,7 @@ local DIRECT_LIMIT = 90
 local DIRECT_WINDOW = 60
 local THROTTLE_STUCK_AFTER = 10
 local THROTTLE_STUCK_TEXT =
-    "Auction house throttle is stuck (Forever client bug). Log out and back in; /reload may not clear it."
+    "Auction house throttle is stuck (Forever client bug). Run :throttle reset or /reload to close the AH and reload."
 
 local function getAPI()
     return rawget(_G, "C_AuctionHouse")

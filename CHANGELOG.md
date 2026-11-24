@@ -2,9 +2,11 @@
 
 ## Unreleased
 
-- Close the auction house on `PLAYER_LOGOUT` so `/reload` clears the auction house throttle the same way logging out does.
-- Detect Forever's stuck auction house throttle (`IsThrottledMessageSystemReady` stuck `false`) and surface `thr: STUCK` with logout/restart instructions instead of waiting forever.
+- Close the auction house before `ReloadUI` runs, so the first `/reload` clears a stuck auction house throttle instead of needing a second reload or a logout.
+- Detect Forever's stuck auction house throttle (`IsThrottledMessageSystemReady` stuck `false`) and surface `thr: STUCK` with a reload/reset instruction instead of waiting forever.
+- Add `:throttle reset` and `:reload` to safely close the AH and reload the UI.
 - Gate "load more" requests on the throttle and share throttle checks across Buy, Sell, Owned, and Bids.
+- Defer Sell auto-price searches until `GetItemKeyInfo` is cached, and use `SendSellSearchQuery` for equipment, avoiding searches Forever can ignore and leave pending.
 - Add `:throttle` diagnostics.
 
 ## 0.5.0
