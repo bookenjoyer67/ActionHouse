@@ -715,6 +715,17 @@ check("search filters", ns.UI.state:GetRowCount() > 0 and ns.UI.state:GetRowCoun
 
 ns.UI:OpenSearch()
 check("search prompt reopens cleanly", ns.UI.prompt.edit:GetText() == "copper", ns.UI.prompt.edit:GetText())
+
+ns.UI:OpenSearch()
+flushTimers()
+check("search prompt keeps previous query", ns.UI.prompt.edit:GetText() == "copper", ns.UI.prompt.edit:GetText())
+check("search prompt selects previous query", ns.UI.prompt.edit.__highlighted == true)
+ns.UI.prompt:Close()
+
+ns.UI:OpenCommand()
+ns.UI.prompt.edit:SetText("demo sell")
+flushTimers()
+check("command prompt does not select existing text", ns.UI.prompt.edit.__highlighted ~= true)
 ns.UI.prompt:Close()
 
 ns.UI:Hide()

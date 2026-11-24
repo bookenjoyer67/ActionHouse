@@ -911,7 +911,7 @@ function UI:OpenSearch()
             ns.Auction:Search(text)
         end, function(text)
             return self:SearchHistoryMatches(text)
-        end, nil, true)
+        end, true, true)
         return
     end
     self.prompt:Open("/", self.state.search, "search", function(text)
@@ -921,7 +921,7 @@ function UI:OpenSearch()
         self:Refresh()
     end, function(text)
         return self:SearchHistoryMatches(text)
-    end, nil, true)
+    end, true, true)
 end
 
 function UI:SetSearch(text)
