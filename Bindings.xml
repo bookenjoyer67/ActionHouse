@@ -1,0 +1,8 @@
+<Bindings>
+    <Binding name="ACTIONHOUSE_TOGGLE" category="ActionHouse" defaultKey="">
+        ActionHouse_Toggle()
+    </Binding>
+    <Binding name="ACTIONHOUSE_HELP" category="ActionHouse" defaultKey="">
+        ActionHouse_Help()
+    </Binding>
+</Bindings>
