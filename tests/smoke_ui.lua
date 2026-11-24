@@ -911,6 +911,47 @@ check("auto price off has no query", offSellForm and offSellForm.priceQueryToken
 ns.UI.sellForm:Hide()
 autoPopulatePrice = true
 
+local savedGetMoney = GetMoney
+
+ns.UI.state:SetCursor(2)
+ns.UI:Refresh()
+ns.UI:PrimaryAction("post")
+local depositSellForm = ns.Sell:GetForm()
+check("deposit test item form", depositSellForm ~= nil and depositSellForm.commodity == false)
+ns.Sell:OnEvent("ITEM_SEARCH_RESULTS_UPDATED", itemResults[1].itemKey)
+calls.postItem = nil
+GetMoney = function()
+    return 500
+end
+ns.UI.sellForm:Key("Enter")
+check("deposit shortfall refuses item post", calls.postItem == nil)
+check(
+    "deposit shortfall message names deposit",
+    type(ns.UI.messageText) == "string"
+        and ns.UI.messageText:find("Not enough gold", 1, true) ~= nil
+        and ns.UI.messageText:find("deposit", 1, true) ~= nil,
+    ns.UI.messageText
+)
+GetMoney = savedGetMoney
+ns.UI.sellForm:Key("Enter")
+check("affordable deposit posts item", calls.postItem ~= nil)
+ns.Sell:OnEvent("AUCTION_HOUSE_AUCTION_CREATED")
+check("affordable deposit form closed", not ns.UI.sellForm:IsShown())
+
+ns.UI.state:SetCursor(2)
+ns.UI:Refresh()
+ns.UI:PrimaryAction("post")
+local noMoneySellForm = ns.Sell:GetForm()
+check("missing money item form", noMoneySellForm ~= nil and noMoneySellForm.commodity == false)
+ns.Sell:OnEvent("ITEM_SEARCH_RESULTS_UPDATED", itemResults[1].itemKey)
+calls.postItem = nil
+GetMoney = nil
+ns.UI.sellForm:Key("Enter")
+check("missing money still posts item", calls.postItem ~= nil)
+GetMoney = savedGetMoney
+ns.Sell:OnEvent("AUCTION_HOUSE_AUCTION_CREATED")
+check("missing money form closed", not ns.UI.sellForm:IsShown())
+
 ns.UI:SetTab("owned")
 check("owned query sent", calls.queryOwned ~= nil)
 ns.Manage:OnEvent("OWNED_AUCTIONS_UPDATED")

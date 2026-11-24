@@ -930,6 +930,18 @@ function Sell:Validate(form)
         return "Invalid duration."
     end
 
+    local deposit = self:GetDeposit(form)
+    if deposit ~= nil and type(GetMoney) == "function" then
+        local moneyOk, money = pcall(GetMoney)
+        if moneyOk and type(money) == "number" and deposit > money then
+            return string.format(
+                "Not enough gold for the deposit: %s needed, you have %s.",
+                ns.Money.Format(deposit),
+                ns.Money.Format(money)
+            )
+        end
+    end
+
     if ns.Auction and type(ns.Auction.CheckThrottle) == "function" then
         local throttleOk, throttleErr = ns.Auction:CheckThrottle()
         if not throttleOk then
