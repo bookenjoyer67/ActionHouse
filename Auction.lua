@@ -6,6 +6,9 @@ ns.Auction = Auction
 local QUERY_TIMEOUT = 10
 local DIRECT_LIMIT = 90
 local DIRECT_WINDOW = 60
+local THROTTLE_STUCK_AFTER = 10
+local THROTTLE_STUCK_TEXT =
+    "Auction house throttle is stuck (Forever client bug). Log out and back in; /reload may not clear it."
 
 local function getAPI()
     return rawget(_G, "C_AuctionHouse")
@@ -148,6 +151,10 @@ function Auction:Init()
     self.searchTimes = {}
     self.sortField = "price"
     self.sortAsc = true
+    self.throttleDownSince = nil
+    self.throttleDownFor = 0
+    self.throttleStuck = false
+    self.throttleWatchToken = 0
 
     self.frame = CreateFrame("Frame")
     self.frame:SetScript("OnEvent", function(_, event, ...)
@@ -319,16 +326,73 @@ function Auction:GetKeyInfo(itemKey, callback)
     end
 end
 
+function Auction:ResetThrottleTracking()
+    self.throttleDownSince = nil
+    self.throttleDownFor = 0
+    self.throttleStuck = false
+    self.throttleWatchToken = (self.throttleWatchToken or 0) + 1
+end
+
+function Auction:NoteThrottle(ready)
+    if not self.active then
+        self:ResetThrottleTracking()
+        return
+    end
+    if ready ~= false then
+        self:ResetThrottleTracking()
+        return
+    end
+
+    local current = now()
+    if not self.throttleDownSince then
+        self.throttleDownSince = current
+        self.throttleWatchToken = (self.throttleWatchToken or 0) + 1
+        local token = self.throttleWatchToken
+        C_Timer.After(THROTTLE_STUCK_AFTER + 0.5, function()
+            if self.throttleWatchToken ~= token then
+                return
+            end
+            self:GetThrottleState()
+            self:Touch()
+        end)
+    end
+
+    self.throttleDownFor = math.max(0, current - self.throttleDownSince)
+    if self.throttleDownFor >= THROTTLE_STUCK_AFTER and not self.throttleStuck then
+        self.throttleStuck = true
+        self:Notify(THROTTLE_STUCK_TEXT, true)
+        self:Touch()
+    end
+end
+
 function Auction:GetThrottleState()
     local fn = apiFunction("IsThrottledMessageSystemReady")
     if not fn then
+        self:ResetThrottleTracking()
         return nil
     end
     local ok, ready = pcall(fn)
     if ok and type(ready) == "boolean" then
+        self:NoteThrottle(ready)
         return ready
     end
+    self:ResetThrottleTracking()
     return nil
+end
+
+function Auction:IsThrottleStuck()
+    return self.throttleStuck and true or false
+end
+
+function Auction:CheckThrottle()
+    local ready = self:GetThrottleState()
+    if self.throttleStuck then
+        return false, THROTTLE_STUCK_TEXT
+    end
+    if ready == false then
+        return false, "Auction house is busy; wait for the throttle."
+    end
+    return true
 end
 
 function Auction:GetThrottleLabel()
@@ -336,10 +400,22 @@ function Auction:GetThrottleLabel()
         return "thr: query"
     end
     local ready = self:GetThrottleState()
+    if self.throttleStuck then
+        return "thr: STUCK"
+    end
     if ready == nil then
         return "thr: ?"
     end
     return ready and "thr: OK" or "thr: WAIT"
+end
+
+function Auction:PrepareForReload()
+    self:ClearPending()
+    self:CancelCommodityPurchase(true)
+    self:ResetThrottleTracking()
+    if ns.Compat and ns.Compat.CloseAuctionHouse then
+        ns.Compat:CloseAuctionHouse()
+    end
 end
 
 function Auction:PruneSearchTimes()
@@ -376,8 +452,9 @@ function Auction:CanQuery(direct)
     if ns.Sell and ns.Sell.IsPriceQueryPending and ns.Sell:IsPriceQueryPending() then
         return false, "Wait for the sell price lookup to finish."
     end
-    if self:GetThrottleState() == false then
-        return false, "Auction house is busy; wait for the throttle."
+    local throttleOk, throttleErr = self:CheckThrottle()
+    if not throttleOk then
+        return false, throttleErr
     end
     if direct then
         local wait = self:GetDirectWait()
@@ -474,6 +551,8 @@ function Auction:GetStatusLines()
         "rows=" .. tostring(#self.rows),
         "pending=" .. tostring(self.pending or "none"),
         "throttle=" .. tostring(self:GetThrottleState()),
+        "throttleDownFor=" .. string.format("%.0f", self.throttleDownFor or 0),
+        "throttleStuck=" .. tostring(self.throttleStuck and true or false),
         "sort=" .. self:GetSortLabel(),
         "detail=" .. detail,
         "quote=" .. quote,
@@ -486,6 +565,8 @@ function Auction:OnShow()
     self:Init()
     self.active = true
     self:ClearPending()
+    self:ResetThrottleTracking()
+    self:GetThrottleState()
     self:CancelCommodityPurchase(true)
     self.mode = "browse"
     self.queryText = ""
@@ -503,6 +584,7 @@ end
 function Auction:OnClose()
     self:CancelCommodityPurchase(true)
     self:ClearPending()
+    self:ResetThrottleTracking()
     self.active = false
     self.rows = {}
     self.rawBrowse = {}
@@ -676,6 +758,12 @@ function Auction:RequestMore()
     end
     if not self.active then
         self:Notify("Open the auction house first.", true)
+        return
+    end
+
+    local throttleOk, throttleErr = self:CheckThrottle()
+    if not throttleOk then
+        self:Notify(throttleErr, true)
         return
     end
 
@@ -1156,9 +1244,14 @@ function Auction:OnEvent(event, ...)
         return
     end
 
+    if event == "AUCTION_HOUSE_THROTTLED_SYSTEM_READY" then
+        self:ResetThrottleTracking()
+        self:Touch()
+        return
+    end
+
     if
-        event == "AUCTION_HOUSE_THROTTLED_SYSTEM_READY"
-        or event == "AUCTION_HOUSE_THROTTLED_MESSAGE_QUEUED"
+        event == "AUCTION_HOUSE_THROTTLED_MESSAGE_QUEUED"
         or event == "AUCTION_HOUSE_THROTTLED_MESSAGE_RESPONSE_RECEIVED"
         or event == "AUCTION_HOUSE_THROTTLED_MESSAGE_SENT"
         or event == "AUCTION_HOUSE_NEW_BID_RECEIVED"

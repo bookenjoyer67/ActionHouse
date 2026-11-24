@@ -622,6 +622,9 @@ local function throttleLabel()
     if not ns.Compat then
         return "thr: ?"
     end
+    if ns.Auction and ns.Auction.IsThrottleStuck and ns.Auction:IsThrottleStuck() then
+        return "thr: STUCK"
+    end
     local ready = ns.Compat:IsThrottled()
     if ready == nil then
         return "thr: ?"
@@ -671,12 +674,15 @@ function UI:UpdateStatus()
     else
         throttle = throttleLabel()
     end
+    if not self.state.demo and ns.Auction and ns.Auction.IsThrottleStuck and ns.Auction:IsThrottleStuck() then
+        throttle = "thr: STUCK"
+    end
     local right = string.format("%s   %s", throttle, ns.Money.FormatShort(safeMoney()))
     if self.state.demo then
         right = "demo   " .. right
     end
     self.statusBar.right:SetText(right)
-    setColor(self.statusBar.right, COLORS.text)
+    setColor(self.statusBar.right, throttle == "thr: STUCK" and COLORS.red or COLORS.text)
 
     local badge = "LIVE"
     if self.state.keytest then

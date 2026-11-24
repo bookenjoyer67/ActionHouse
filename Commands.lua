@@ -107,6 +107,37 @@ local COMMANDS = {
         end,
     },
     {
+        name = "throttle",
+        usage = "throttle",
+        desc = "Show auction house throttle status and recovery steps.",
+        run = function()
+            local auction = ns.Auction
+            if auction then
+                auction:Init()
+            end
+            local ready
+            if auction then
+                ready = auction:GetThrottleState()
+            end
+            local stuck = auction and auction.IsThrottleStuck and auction:IsThrottleStuck() or false
+            local downFor = auction and auction.throttleDownFor or 0
+            ns:Print(
+                string.format(
+                    "throttle ready=%s stuck=%s downFor=%.0fs AH open=%s",
+                    tostring(ready),
+                    tostring(stuck),
+                    downFor,
+                    tostring(ns.Compat:IsAuctionHouseOpen())
+                )
+            )
+            if stuck then
+                ns:Print("The client throttle is frozen. Log out and back in; /reload may not clear it.")
+            elseif ready == false then
+                ns:Print("Waiting for the auction house throttle.")
+            end
+        end,
+    },
+    {
         name = "back",
         usage = "back",
         desc = "Return from item detail to search results.",

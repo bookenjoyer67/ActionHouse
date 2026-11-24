@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Close the auction house on `PLAYER_LOGOUT` so `/reload` clears the auction house throttle the same way logging out does.
+- Detect Forever's stuck auction house throttle (`IsThrottledMessageSystemReady` stuck `false`) and surface `thr: STUCK` with logout/restart instructions instead of waiting forever.
+- Gate "load more" requests on the throttle and share throttle checks across Buy, Sell, Owned, and Bids.
+- Add `:throttle` diagnostics.
+
 ## 0.5.0
 
 First public release.

@@ -126,7 +126,7 @@ function ns:SaveProbe(lines)
 end
 
 local function showUsage()
-    ns:Print("commands: /ahv | live | demo [tab] | status | probe | keytest | toggle | help")
+    ns:Print("commands: /ahv | live | demo [tab] | status | throttle | probe | keytest | toggle | help")
     ns:Print("in game: ? help  : commands  / search  Enter drill-in  b bid  B buyout")
     ns:Print("  :sell  :owned  :bids  :post  :cancel  :raise [money]  :price")
     ns:Print("  :search <text>  :filter <expr>  :sort <field> [asc|desc]  :set <key>=<value>")
@@ -137,6 +137,8 @@ end
 local events = CreateFrame("Frame")
 events:RegisterEvent("ADDON_LOADED")
 events:RegisterEvent("PLAYER_LOGIN")
+events:RegisterEvent("PLAYER_LEAVING_WORLD")
+events:RegisterEvent("PLAYER_LOGOUT")
 events:RegisterEvent("AUCTION_HOUSE_SHOW")
 events:RegisterEvent("AUCTION_HOUSE_CLOSED")
 events:RegisterEvent("PLAYER_REGEN_DISABLED")
@@ -182,6 +184,13 @@ events:SetScript("OnEvent", function(_, event, ...)
     end
 
     if ns.disabled then
+        return
+    end
+
+    if event == "PLAYER_LEAVING_WORLD" or event == "PLAYER_LOGOUT" then
+        if ns.Auction and ns.Auction.PrepareForReload then
+            ns.Auction:PrepareForReload()
+        end
         return
     end
 

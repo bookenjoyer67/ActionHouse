@@ -388,7 +388,8 @@ function Sell:RequestPrice(form, isRetry)
     end
     local ok = auction:CanQuery(true)
     if not ok then
-        if not isRetry then
+        local stuck = auction.IsThrottleStuck and auction:IsThrottleStuck()
+        if not isRetry and not stuck then
             self:SchedulePriceRetry(form)
         end
         return false
@@ -909,8 +910,11 @@ function Sell:Validate(form)
         return "Invalid duration."
     end
 
-    if ns.Auction and ns.Auction:GetThrottleState() == false then
-        return "Auction house is busy; wait for the throttle."
+    if ns.Auction and type(ns.Auction.CheckThrottle) == "function" then
+        local throttleOk, throttleErr = ns.Auction:CheckThrottle()
+        if not throttleOk then
+            return throttleErr
+        end
     end
 
     if form.commodity then

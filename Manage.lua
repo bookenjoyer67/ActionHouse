@@ -183,7 +183,14 @@ function Manage:GetThrottleLabel()
     if self.pendingKind then
         return "thr: query"
     end
-    local ready = ns.Auction and ns.Auction:GetThrottleState()
+    local auction = ns.Auction
+    if not auction or type(auction.GetThrottleState) ~= "function" then
+        return "thr: ?"
+    end
+    local ready = auction:GetThrottleState()
+    if auction.IsThrottleStuck and auction:IsThrottleStuck() then
+        return "thr: STUCK"
+    end
     if ready == nil then
         return "thr: ?"
     end
@@ -240,9 +247,11 @@ function Manage:CanQuery()
     if ns.Sell and type(ns.Sell.IsPriceQueryPending) == "function" and ns.Sell:IsPriceQueryPending() then
         return false, "Wait for the sell price lookup to finish."
     end
-    local ready = ns.Auction and ns.Auction:GetThrottleState()
-    if ready == false then
-        return false, "Auction house is busy; wait for the throttle."
+    if ns.Auction and type(ns.Auction.CheckThrottle) == "function" then
+        local throttleOk, throttleErr = ns.Auction:CheckThrottle()
+        if not throttleOk then
+            return false, throttleErr
+        end
     end
     return true
 end
