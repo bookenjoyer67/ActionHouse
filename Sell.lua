@@ -886,6 +886,52 @@ function Sell:GetTotal(form)
     return unit * quantity.value
 end
 
+function Sell:GetVendorWarning(form)
+    if not form then
+        return false
+    end
+    local quantity = self:GetField(form, "quantity")
+    if not quantity then
+        return false
+    end
+    local vendor = getVendorPrice(form.itemLink)
+    local vendorTotal = vendor and vendor * quantity.value or nil
+    if not vendorTotal or vendorTotal <= 0 then
+        return false
+    end
+
+    local proceeds = 0
+    if form.commodity then
+        local unit = self:GetField(form, "unitPrice")
+        proceeds = (unit and unit.value or 0) * quantity.value
+    else
+        local buyout = self:GetField(form, "buyout")
+        local bid = self:GetField(form, "bid")
+        if buyout and buyout.value > 0 then
+            proceeds = buyout.value
+        elseif bid then
+            proceeds = bid.value
+        end
+    end
+    if proceeds <= 0 then
+        return false
+    end
+
+    local net = math.floor(proceeds * 0.95) -- auction house 5% cut
+    if vendorTotal <= net then
+        return false
+    end
+
+    return true,
+        string.format(
+            "Vendor pays %s for %dx %s; the auction nets %s after the 5%% cut. List anyway?",
+            ns.Money.Format(vendorTotal),
+            quantity.value,
+            tostring(form.name),
+            ns.Money.Format(net)
+        )
+end
+
 function Sell:SupportsCopper()
     local fn = apiFunction("SupportsCopperValues")
     if not fn then
@@ -1139,7 +1185,7 @@ local function cachePendingPost(commodity, ...)
     return ok
 end
 
-function Sell:PostForm(form)
+function Sell:PostForm(form, confirmed)
     if not form or form ~= self.form then
         return false
     end
@@ -1152,6 +1198,18 @@ function Sell:PostForm(form)
     if err then
         self:Notify(err, true)
         return false
+    end
+
+    if not confirmed and ns.UI and type(ns.UI.OpenConfirm) == "function" and not (ns.UI.state and ns.UI.state.demo) then
+        local warn, text = self:GetVendorWarning(form)
+        if warn then
+            ns.UI:OpenConfirm(text, function()
+                self:PostForm(form, true)
+            end, function()
+                self:Notify("Listing cancelled.")
+            end, "SELLFORM")
+            return false
+        end
     end
 
     local quantity = self:GetField(form, "quantity")

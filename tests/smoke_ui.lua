@@ -952,6 +952,76 @@ GetMoney = savedGetMoney
 ns.Sell:OnEvent("AUCTION_HOUSE_AUCTION_CREATED")
 check("missing money form closed", not ns.UI.sellForm:IsShown())
 
+local savedItemInfo = C_Item.GetItemInfo
+local vendorPrice = 400000
+C_Item.GetItemInfo = function(value)
+    if value == "|cff0070dd|Hitem:2771::::::::::|h[Test Item]|h|r" then
+        return "Test Item", nil, 1, 1, 1, "Trade Goods", "Metal & Stone", 20, "", nil, vendorPrice, vendorPrice
+    end
+    return savedItemInfo(value)
+end
+
+local vendorPostCount = 0
+local savedPostItem = C_AuctionHouse.PostItem
+C_AuctionHouse.PostItem = function(...)
+    vendorPostCount = vendorPostCount + 1
+    return savedPostItem(...)
+end
+
+local function openVendorWarningItemForm()
+    ns.UI.state:SetCursor(2)
+    ns.UI:Refresh()
+    ns.UI:PrimaryAction("post")
+    local form = ns.Sell:GetForm()
+    ns.Sell:OnEvent("ITEM_SEARCH_RESULTS_UPDATED", itemResults[1].itemKey)
+    return form
+end
+
+local vendorForm = openVendorWarningItemForm()
+check("vendor warning item form", vendorForm ~= nil and vendorForm.commodity == false)
+ns.Sell:SetField(vendorForm, "buyout", 300000)
+vendorPostCount = 0
+ns.UI.sellForm:Key("Enter")
+local warningText = ns.UI.confirm.text:GetText()
+check("vendor warning confirm shown", ns.UI.confirm:IsShown())
+check("vendor warning blocks item post", vendorPostCount == 0, vendorPostCount)
+check(
+    "vendor warning text says vendor pays",
+    type(warningText) == "string" and warningText:find("Vendor pays", 1, true) ~= nil,
+    warningText
+)
+check(
+    "vendor warning text says cut",
+    type(warningText) == "string" and warningText:find("cut", 1, true) ~= nil,
+    warningText
+)
+check("vendor warning keeps form open", ns.UI.sellForm:IsShown())
+ns.UI:ResolveConfirm(true)
+check("vendor warning accepted posts once", vendorPostCount == 1, vendorPostCount)
+ns.Sell:OnEvent("AUCTION_HOUSE_AUCTION_CREATED")
+
+vendorForm = openVendorWarningItemForm()
+check("vendor warning refused item form", vendorForm ~= nil and vendorForm.commodity == false)
+ns.Sell:SetField(vendorForm, "buyout", 300000)
+vendorPostCount = 0
+ns.UI.sellForm:Key("Enter")
+check("vendor warning second confirm shown", ns.UI.confirm:IsShown())
+ns.UI:ResolveConfirm(false)
+check("vendor warning refused posts nothing", vendorPostCount == 0, vendorPostCount)
+check("vendor warning refused keeps form open", ns.UI.sellForm:IsShown())
+
+vendorPrice = 1000
+ns.UI.sellForm:Key("Enter")
+check(
+    "vendor below auction net posts without confirm",
+    vendorPostCount == 1 and not ns.UI.confirm:IsShown(),
+    vendorPostCount
+)
+ns.Sell:OnEvent("AUCTION_HOUSE_AUCTION_CREATED")
+
+C_Item.GetItemInfo = savedItemInfo
+C_AuctionHouse.PostItem = savedPostItem
+
 ns.UI:SetTab("owned")
 check("owned query sent", calls.queryOwned ~= nil)
 ns.Manage:OnEvent("OWNED_AUCTIONS_UPDATED")
