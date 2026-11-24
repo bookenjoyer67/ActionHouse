@@ -1,0 +1,35 @@
+name: Release
+
+# Push a version tag (no "v" prefix) to publish:
+#   git tag 0.6.0 && git push origin 0.6.0
+on:
+  push:
+    tags:
+      - "[0-9]*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Stamp the tag into the TOC
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          sed -i -E "s/^## Version:.*/## Version: ${version}/" ActionHouse.toc
+          grep -E '^## (Title|Version|Interface|X-Curse-Project-ID):' ActionHouse.toc
+
+      - name: Package and publish
+        uses: BigWigsMods/packager@v2
+        with:
+          args: -n "{package-name}-{project-version}:{project-version}"
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          GH_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}

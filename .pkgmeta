@@ -1,0 +1,10 @@
+# BigWigs packager manifest for ActionHouse.
+# Everything not listed here ships inside ActionHouse-<version>.zip.
+ignore:
+  - .github
+  - .gitignore
+  - .selene.toml
+  - stylua.toml
+  - install.sh
+  - dist
+  - tests
