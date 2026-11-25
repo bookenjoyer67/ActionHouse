@@ -498,6 +498,9 @@ end
 
 function UI:SetTab(tab)
     self:ClearShiftComparison()
+    if ns.Manage and self.state.tab == "owned" and tab ~= "owned" then
+        ns.Manage.cancelPin = nil
+    end
     self.hoverUpgrade = nil
     self.hoverUpgradeRow = nil
     if not self:TabAvailable(tab) then

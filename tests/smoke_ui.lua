@@ -199,8 +199,13 @@ function time()
     return os.time()
 end
 
+local currentTime = os.time()
 function GetTime()
-    return os.time()
+    return currentTime
+end
+
+local function advanceTime(seconds)
+    currentTime = currentTime + seconds
 end
 
 function GetRealmName()
@@ -1216,5 +1221,112 @@ end
 ns.Manage:OnEvent("AUCTION_CANCELED", cancelRow.auctionID)
 check("cancel drops row", ns.UI.state:GetRowCount() == rowsBeforeCancel - 1, ns.UI.state:GetRowCount())
 check("cancel keeps cursor", ns.UI.state.cursor == cursorBeforeCancel, ns.UI.state.cursor)
+
+ns.Manage:OnEvent("OWNED_AUCTIONS_UPDATED")
+check("previous cancel pin cleared", ns.Manage.cancelPin == nil, ns.Manage.cancelPin and ns.Manage.cancelPin.auctionID)
+
+ownedResults = {
+    {
+        auctionID = 501,
+        itemKey = { itemID = 2770, itemLevel = 0, itemSuffix = 0, battlePetSpeciesID = 0 },
+        itemLink = "item:2770",
+        quantity = 1,
+        bidAmount = 1000,
+        buyoutAmount = 2000,
+        timeLeftSeconds = 3000,
+        status = 0,
+        bidder = nil,
+    },
+    {
+        auctionID = 502,
+        itemKey = { itemID = 2771, itemLevel = 32, itemSuffix = 0, battlePetSpeciesID = 0 },
+        itemLink = "item:2771",
+        quantity = 1,
+        bidAmount = 2000,
+        buyoutAmount = 4000,
+        timeLeftSeconds = 2000,
+        status = 0,
+        bidder = nil,
+    },
+    {
+        auctionID = 503,
+        itemKey = { itemID = 2770, itemLevel = 0, itemSuffix = 0, battlePetSpeciesID = 0 },
+        itemLink = "item:2770",
+        quantity = 1,
+        bidAmount = 3000,
+        buyoutAmount = 6000,
+        timeLeftSeconds = 1000,
+        status = 0,
+        bidder = nil,
+    },
+}
+ns.UI:SetTab("owned")
+ns.Manage:OnEvent("OWNED_AUCTIONS_UPDATED")
+check("pin fixture rows", ns.UI.state:GetRowCount() == 3, ns.UI.state:GetRowCount())
+ns.UI.state:SetCursor(2)
+ns.UI:Refresh()
+local pinCancelRow = ns.UI.state:GetSelected()
+check("pin cancel row", pinCancelRow and pinCancelRow.auctionID == 502, pinCancelRow and pinCancelRow.auctionID)
+local pinCursor = ns.UI.state.cursor
+check("pin cancel accepted", ns.Manage:CancelOwned(pinCancelRow) == true)
+check(
+    "pin created",
+    ns.Manage.cancelPin ~= nil and ns.Manage.cancelPin.auctionID == 502,
+    ns.Manage.cancelPin and ns.Manage.cancelPin.auctionID
+)
+
+ns.Manage:OnEvent("OWNED_AUCTIONS_UPDATED")
+check("pin keeps cursor while auction present", ns.UI.state.cursor == pinCursor, ns.UI.state.cursor)
+check(
+    "pin survives refresh while auction present",
+    ns.Manage.cancelPin ~= nil and ns.Manage.cancelPin.auctionID == 502,
+    ns.Manage.cancelPin and ns.Manage.cancelPin.auctionID
+)
+
+for index, info in ipairs(ownedResults) do
+    if info.auctionID == 502 then
+        table.remove(ownedResults, index)
+        break
+    end
+end
+ns.Manage:OnEvent("OWNED_AUCTIONS_UPDATED")
+check("pin keeps cursor on settling refresh", ns.UI.state.cursor == pinCursor, ns.UI.state.cursor)
+check(
+    "pin cleared once auction gone",
+    ns.Manage.cancelPin == nil,
+    ns.Manage.cancelPin and ns.Manage.cancelPin.auctionID
+)
+
+ns.Manage:OnEvent("OWNED_AUCTIONS_UPDATED")
+check("ordinary refresh resets after pin cleared", ns.UI.state.cursor == 1, ns.UI.state.cursor)
+
+ns.Manage:OnEvent("AUCTION_CANCELED", 502)
+ns.UI.state:SetCursor(2)
+ns.UI:Refresh()
+local expiryCancelRow = ns.UI.state:GetSelected()
+check(
+    "expiry cancel row",
+    expiryCancelRow and expiryCancelRow.auctionID == 501,
+    expiryCancelRow and expiryCancelRow.auctionID
+)
+check("expiry cancel accepted", ns.Manage:CancelOwned(expiryCancelRow) == true)
+advanceTime(21)
+ns.Manage:OnEvent("OWNED_AUCTIONS_UPDATED")
+check("expired pin resets cursor", ns.UI.state.cursor == 1, ns.UI.state.cursor)
+check("expired pin cleared", ns.Manage.cancelPin == nil, ns.Manage.cancelPin and ns.Manage.cancelPin.auctionID)
+
+ns.Manage:OnEvent("AUCTION_CANCELED", 501)
+ns.UI.state:SetCursor(1)
+ns.UI:Refresh()
+local tabCancelRow = ns.UI.state:GetSelected()
+check("tab switch cancel row", tabCancelRow and tabCancelRow.auctionID == 503, tabCancelRow and tabCancelRow.auctionID)
+check("tab switch cancel accepted", ns.Manage:CancelOwned(tabCancelRow) == true)
+check(
+    "tab switch pin active",
+    ns.Manage.cancelPin ~= nil and ns.Manage.cancelPin.auctionID == 503,
+    ns.Manage.cancelPin and ns.Manage.cancelPin.auctionID
+)
+ns.UI:SetTab("buy")
+check("tab switch clears pin", ns.Manage.cancelPin == nil, ns.Manage.cancelPin and ns.Manage.cancelPin.auctionID)
 
 io.write("smoke_ui: ", count, " checks passed\n")

@@ -121,6 +121,7 @@ function Manage:Init()
     self.requestSeq = 0
     self.lastError = nil
     self.cancelPending = nil
+    self.cancelPin = nil
     self.bidPending = nil
     self.refreshToken = 0
 
@@ -468,6 +469,19 @@ function Manage:CancelOwned(row)
     end
 
     self.cancelPending = row.auctionID
+    local pinTime
+    if type(GetTime) == "function" then
+        pinTime = GetTime()
+    end
+    local pinCursor
+    if ns.UI and ns.UI.state then
+        pinCursor = ns.UI.state.cursor
+    end
+    self.cancelPin = {
+        auctionID = row.auctionID,
+        cursor = pinCursor,
+        time = pinTime,
+    }
     self.lastError = nil
     self:Notify("Cancelling auction...")
     self:Touch()
@@ -556,7 +570,38 @@ function Manage:OnEvent(event, ...)
             self:Notify(string.format("%d owned auctions.", #self.ownedRows))
         end
         if wasPending or (ns.UI and ns.UI.state and ns.UI.state.tab == "owned") then
-            self:Changed("owned", true)
+            local reset = true
+            local clearPin = false
+            local pin = self.cancelPin
+            if pin then
+                local now
+                if type(GetTime) == "function" then
+                    now = GetTime()
+                end
+                if pin.time ~= nil and now ~= nil and (now - pin.time) > 20 then
+                    self.cancelPin = nil
+                    pin = nil
+                else
+                    reset = false
+                    local pinnedID = tonumber(pin.auctionID)
+                    local stillOwned = false
+                    if pinnedID then
+                        for _, ownedRow in ipairs(self.ownedRows) do
+                            if tonumber(ownedRow.auctionID) == pinnedID then
+                                stillOwned = true
+                                break
+                            end
+                        end
+                    end
+                    if not stillOwned then
+                        clearPin = true
+                    end
+                end
+            end
+            self:Changed("owned", reset)
+            if clearPin then
+                self.cancelPin = nil
+            end
         end
         self:Touch()
         return
