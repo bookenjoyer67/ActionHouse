@@ -2,7 +2,7 @@
 ## Title: ActionHouse
 ## Notes: Vim-style keyboard control for the WoW Forever auction house. Type /ahv.
 ## Author: Argus
-## Version: 0.5.3
+## Version: 0.5.4
 ## X-License: MIT
 ## X-Curse-Project-ID: 1827802
 ## X-Website: https://www.curseforge.com/wow/addons/actionhouse
