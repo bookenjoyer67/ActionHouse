@@ -594,7 +594,7 @@ function Manage:OnEvent(event, ...)
         if self.active then
             self:BuildOwnedRows()
             if ns.UI and ns.UI.state and ns.UI.state.tab == "owned" then
-                self:Changed("owned", true)
+                self:Changed("owned", false)
             end
         end
         self:Touch()

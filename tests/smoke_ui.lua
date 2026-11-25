@@ -141,6 +141,29 @@ function CreateFrame(kind, name)
     return newObject(kind, name)
 end
 
+local gameTooltip = {
+    __shown = false,
+    __owner = nil,
+    __link = nil,
+    __lines = 0,
+}
+function gameTooltip:SetOwner(owner)
+    self.__owner = owner
+end
+function gameTooltip:SetHyperlink(link)
+    self.__link = link
+end
+function gameTooltip:Show()
+    self.__shown = true
+end
+function gameTooltip:Hide()
+    self.__shown = false
+end
+function gameTooltip:AddLine()
+    self.__lines = self.__lines + 1
+end
+_G.GameTooltip = gameTooltip
+
 local pendingTimers = {}
 local function flushTimers()
     local timers = pendingTimers
@@ -1081,5 +1104,117 @@ check(":b hides ActionHouse", not ns.UI:IsShown())
 local probeLines = ns.Compat:Probe(false)
 check("probe lines", type(probeLines) == "table" and #probeLines > 10, type(probeLines))
 check("probe saved", ns.db.probe ~= nil and ns.db.probe.lines ~= nil)
+
+gameTooltip.__shown = false
+gameTooltip.__owner = nil
+gameTooltip.__link = nil
+gameTooltip.__lines = 0
+
+ns.db.autoShow = true
+ns.UI:OnAuctionHouseShow()
+check("shift setup live", ns.UI:IsShown() and not ns.UI.state.demo)
+check("shift setup buy", ns.UI.state.tab == "buy", ns.UI.state.tab)
+
+ns.UI:SetSearch("copper")
+ns.Auction:OnEvent("AUCTION_HOUSE_BROWSE_RESULTS_UPDATED")
+check("shift buy browse rows", ns.UI.state:GetRowCount() == 2, ns.UI.state:GetRowCount())
+ns.UI.state:SetCursor(2)
+ns.UI:Refresh()
+ns.UI:PrimaryAction()
+ns.Auction:OnEvent(
+    "ITEM_SEARCH_RESULTS_UPDATED",
+    { itemID = 2771, itemLevel = 0, itemSuffix = 0, battlePetSpeciesID = 0 }
+)
+ns.UI.state:SetCursor(1)
+ns.UI:Refresh()
+local buyShiftRow = ns.UI.state:GetSelected()
+check("shift buy row link", buyShiftRow and buyShiftRow.itemLink ~= nil, buyShiftRow and buyShiftRow.itemLink)
+local buyShiftFrame = ns.UI.list.rowFrames[ns.UI.state.cursor - ns.UI.state.top + 1]
+gameTooltip.__shown = false
+gameTooltip.__owner = nil
+gameTooltip.__link = nil
+gameTooltip.__lines = 0
+shiftDown = true
+ns.UI:UpdateShiftComparison()
+check("shift buy tooltip shown", gameTooltip.__shown == true)
+check("shift buy tooltip link", gameTooltip.__link == buyShiftRow.itemLink, gameTooltip.__link)
+check("shift buy tooltip owner", buyShiftFrame ~= nil and gameTooltip.__owner == buyShiftFrame)
+shiftDown = false
+ns.UI:UpdateShiftComparison()
+check("shift buy tooltip hidden", gameTooltip.__shown == false)
+shiftDown = true
+ns.UI:OnUpdate(0)
+check("shift buy tooltip reshown via update", gameTooltip.__shown == true)
+ns.Auction:Back()
+ns.UI.state:SetCursor(1)
+ns.UI:Refresh()
+local buyUnlinkedRow = ns.UI.state:GetSelected()
+check("shift buy unlinked row", buyUnlinkedRow and not buyUnlinkedRow.itemLink)
+ns.UI:UpdateShiftComparison()
+check("shift buy unlinked no tooltip", gameTooltip.__shown == false and ns.UI.shiftTooltipRow == nil)
+shiftDown = false
+
+ownedResults[3] = {
+    auctionID = 303,
+    itemKey = { itemID = 2770, itemLevel = 0, itemSuffix = 0, battlePetSpeciesID = 0 },
+    quantity = 5,
+    bidAmount = 900,
+    buyoutAmount = 1800,
+    timeLeftSeconds = 3600,
+    status = 0,
+}
+ns.UI:SetTab("owned")
+ns.Manage:OnEvent("OWNED_AUCTIONS_UPDATED")
+check("shift owned rows", ns.UI.state:GetRowCount() == 3, ns.UI.state:GetRowCount())
+
+ns.UI.state:SetCursor(1)
+ns.UI:Refresh()
+local ownedShiftRow = ns.UI.state:GetSelected()
+check("shift owned row link", ownedShiftRow and ownedShiftRow.itemLink ~= nil, ownedShiftRow and ownedShiftRow.itemLink)
+local ownedShiftFrame = ns.UI.list.rowFrames[ns.UI.state.cursor - ns.UI.state.top + 1]
+gameTooltip.__shown = false
+gameTooltip.__owner = nil
+gameTooltip.__link = nil
+gameTooltip.__lines = 0
+shiftDown = true
+ns.UI:UpdateShiftComparison()
+check("shift owned tooltip shown", gameTooltip.__shown == true)
+check("shift owned tooltip link", gameTooltip.__link == ownedShiftRow.itemLink, gameTooltip.__link)
+check("shift owned tooltip owner", ownedShiftFrame ~= nil and gameTooltip.__owner == ownedShiftFrame)
+shiftDown = false
+ns.UI:UpdateShiftComparison()
+check("shift owned tooltip hidden", gameTooltip.__shown == false)
+shiftDown = true
+ns.UI:UpdateShiftComparison()
+check("shift owned tooltip reshown", gameTooltip.__shown == true)
+local ownedUnlinkedIndex
+for index, row in ipairs(ns.UI.state.rows) do
+    if not row.itemLink then
+        ownedUnlinkedIndex = index
+    end
+end
+check("shift owned unlinked row", ownedUnlinkedIndex ~= nil)
+ns.UI.state:SetCursor(ownedUnlinkedIndex)
+ns.UI:Refresh()
+ns.UI:UpdateShiftComparison()
+check("shift owned unlinked no tooltip", gameTooltip.__shown == false and ns.UI.shiftTooltipRow == nil)
+shiftDown = false
+
+ns.UI.state:SetCursor(2)
+ns.UI:Refresh()
+local cancelRow = ns.UI.state:GetSelected()
+check("cancel cursor row is active", cancelRow and cancelRow.auctionID == 301, cancelRow and cancelRow.auctionID)
+local cursorBeforeCancel = ns.UI.state.cursor
+local rowsBeforeCancel = ns.UI.state:GetRowCount()
+check("cancel accepted", ns.Manage:CancelOwned(cancelRow) == true)
+for index, info in ipairs(ownedResults) do
+    if info.auctionID == cancelRow.auctionID then
+        table.remove(ownedResults, index)
+        break
+    end
+end
+ns.Manage:OnEvent("AUCTION_CANCELED", cancelRow.auctionID)
+check("cancel drops row", ns.UI.state:GetRowCount() == rowsBeforeCancel - 1, ns.UI.state:GetRowCount())
+check("cancel keeps cursor", ns.UI.state.cursor == cursorBeforeCancel, ns.UI.state.cursor)
 
 io.write("smoke_ui: ", count, " checks passed\n")

@@ -820,15 +820,22 @@ function UI:UpdateStatus()
 end
 
 function UI:OnUpdate(elapsed)
-    if not self.state or self.state.tab ~= "upgrades" or self.state.demo then
+    if not self.state or self.state.demo then
         self:ClearShiftComparison()
         return
     end
-    if not self.frame or not self.frame:IsShown() or not ns.Upgrades then
+    if not self.frame or not self.frame:IsShown() then
+        self:ClearShiftComparison()
+        return
+    end
+    if self.state.tab == "upgrades" and not ns.Upgrades then
         self:ClearShiftComparison()
         return
     end
     self:UpdateShiftComparison()
+    if self.state.tab ~= "upgrades" then
+        return
+    end
     self.upgradesPoll = (self.upgradesPoll or 0) + (elapsed or 0)
     if self.upgradesPoll < 0.5 then
         return
@@ -1590,13 +1597,7 @@ function UI:ClearShiftComparison()
 end
 
 function UI:UpdateShiftComparison()
-    if
-        not self.frame
-        or not self.frame:IsShown()
-        or not self.state
-        or self.state.tab ~= "upgrades"
-        or self.state.demo
-    then
+    if not self.frame or not self.frame:IsShown() or not self.state or self.state.demo then
         self:ClearShiftComparison()
         return
     end
@@ -1625,7 +1626,7 @@ function UI:UpdateShiftComparison()
         return
     end
     local row = self.state:GetSelected()
-    if not row or row.view ~= "upgrade" or not row.itemLink then
+    if not row or not row.itemLink then
         self:ClearShiftComparison()
         return
     end
